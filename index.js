@@ -1,8 +1,8 @@
+const express = require('express');
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const dotenv = require('dotenv');
 const fs = require('fs');
 const axios = require('axios');
-const express = require('express');
 
 dotenv.config();
 
@@ -454,10 +454,16 @@ async function handleSlowmodeCommand(interaction) {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.get('/', (req, res) => {
+  res.send('Bienvenido a la API del Bot!');
+});
+
 app.get('/status', (req, res) => {
-res.send('Bot activo');
+  res.send('Bot activo');
 });
+
 app.listen(PORT, () => {
-console.log(`Server is running on port ${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });
+
 client.login(process.env.BOT_TOKEN);
