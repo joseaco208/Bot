@@ -1,17 +1,14 @@
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const dotenv = require('dotenv');
 const fs = require('fs');
-const path = require('path');
 const axios = require('axios');
+const express = require('express');
 
 dotenv.config();
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.MessageContent] });
-let muteRole = null; // Rol de mute
+let muteRole = null;
 
-// --- Funciones auxiliares ---
-
-// Función para obtener el clientID a partir del BOT_TOKEN
 async function getClientId(token) {
   try {
     const response = await axios.get('https://discord.com/api/v10/users/@me', {
@@ -26,7 +23,6 @@ async function getClientId(token) {
   }
 }
 
-// Función para convertir una cadena de tiempo a milisegundos
 function parseTime(timeStr) {
   const timeRegex = /^(\d+)([smhd])$/;
   const match = timeStr.match(timeRegex);
@@ -44,7 +40,6 @@ function parseTime(timeStr) {
   }
 }
 
-// Función para cargar la base de datos de advertencias (JSON)
 function loadWarns() {
   try {
     const data = fs.readFileSync('warns.json');
@@ -55,7 +50,6 @@ function loadWarns() {
   }
 }
 
-// Función para guardar la base de datos de advertencias (JSON)
 function saveWarns(warns) {
   try {
     fs.writeFileSync('warns.json', JSON.stringify(warns, null, 2));
@@ -63,8 +57,6 @@ function saveWarns(warns) {
     console.error('Error al guardar la base de datos de advertencias:', error);
   }
 }
-
-// --- Gestión de comandos ---
 
 const commands = [
   new SlashCommandBuilder()
@@ -131,12 +123,9 @@ const commands = [
 
 const warns = loadWarns();
 
-// --- Manejo de eventos ---
-
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}!`);
 
-  // Registra los comandos en Discord
   try {
     const clientId = await getClientId(process.env.BOT_TOKEN);
     const rest = new REST({ version: '10' }).setToken(process.env.BOT_TOKEN);
@@ -182,14 +171,11 @@ client.on('interactionCreate', async interaction => {
   }
 });
 
-// --- Funciones de manejo de comandos ---
-
 async function handleWarnCommand(interaction) {
   const user = interaction.options.getUser('usuario');
   const reason = interaction.options.getString('razón') || 'Sin razón proporcionada';
   const moderator = interaction.user.tag;
 
-  // Guarda la advertencia en la base de datos
   warns[user.id] = warns[user.id] || [];
   warns[user.id].push({ reason, moderator });
   saveWarns(warns);
@@ -240,9 +226,9 @@ async function handleUnwarnCommand(interaction) {
 
   const removedWarning = userWarns.pop();
   if (userWarns.length === 0) {
-    delete warns[user.id]; // Elimina el usuario si no tiene más advertencias
+    delete warns[user.id];
   } else {
-    warns[user.id] = userWarns; // Actualiza la lista de advertencias
+    warns[user.id] = userWarns;
   }
   saveWarns(warns);
 
@@ -265,23 +251,19 @@ async function handleMuteCommand(interaction) {
   const reason = interaction.options.getString('razón') || 'Sin razón especificada';
   const member = await interaction.guild.members.fetch(user.id);
 
-  // Verifica si el bot tiene permisos suficientes
   if (!interaction.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
     return await interaction.reply('No tengo permisos suficientes para silenciar a ese usuario.');
   }
 
-  // Verifica si el rol de silencio está configurado
   if (!muteRole) {
     return await interaction.reply('El rol de silencio no está configurado. Usa `/setmuterole` para configurarlo.');
   }
 
-  // Valida el tiempo de silencio
   const muteDuration = parseTime(timeStr);
   if (!muteDuration) {
     return await interaction.reply('Formato de tiempo inválido. Usa "10s", "1m", "1h", etc.');
   }
 
-  // Silencia al usuario
   await member.roles.add(muteRole, reason);
 
   const embed = new EmbedBuilder()
@@ -296,7 +278,6 @@ async function handleMuteCommand(interaction) {
 
   await interaction.reply({ embeds: [embed] });
 
-  // Desactiva el silencio después del tiempo especificado
   setTimeout(async () => {
     try {
       await member.roles.remove(muteRole);
@@ -311,17 +292,14 @@ async function handleUnmuteCommand(interaction) {
   const user = interaction.options.getUser('usuario');
   const member = await interaction.guild.members.fetch(user.id);
 
-  // Verifica si el bot tiene permisos suficientes
   if (!interaction.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
     return await interaction.reply('No tengo permisos suficientes para deshacer el silencio de ese usuario.');
   }
 
-  // Verifica si el rol de silencio está configurado
   if (!muteRole) {
     return await interaction.reply('El rol de silencio no está configurado. Usa `/setmuterole` para configurarlo.');
   }
 
-  // Desactiva el silencio del usuario
   await member.roles.remove(muteRole);
 
   const embed = new EmbedBuilder()
@@ -336,7 +314,6 @@ async function handleUnmuteCommand(interaction) {
 async function handleSetMuteRoleCommand(interaction) {
   const role = interaction.options.getRole('rol');
 
-  // Verifica si el bot tiene permisos suficientes
   if (!interaction.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
     return await interaction.reply('No tengo permisos suficientes para establecer el rol de silencio.');
   }
@@ -351,23 +328,19 @@ async function handleTempBanCommand(interaction) {
   const reason = interaction.options.getString('razón') || 'Sin razón especificada';
   const member = await interaction.guild.members.fetch(user.id);
 
-  // Verifica que no se intente banear a un administrador
   if (member.permissions.has(PermissionFlagsBits.Administrator)) {
     return await interaction.reply('No puedes banear a un usuario con permisos de administrador.');
   }
 
-  // Verifica si el bot tiene permisos suficientes
   if (!interaction.member.permissions.has(PermissionFlagsBits.BanMembers)) {
     return await interaction.reply('No tengo permisos suficientes como para banear temporalmente a ese usuario.');
   }
 
-  // Valida el tiempo de baneo
   const banDuration = parseTime(timeStr);
   if (!banDuration) {
     return await interaction.reply('Formato de tiempo inválido. Usa "10s", "1m", "1h", etc.');
   }
 
-  // Banea al usuario
   await interaction.guild.members.ban(user, { reason });
 
   const embed = new EmbedBuilder()
@@ -382,7 +355,6 @@ async function handleTempBanCommand(interaction) {
 
   await interaction.reply({ embeds: [embed] });
 
-  // Programa el desbaneo
   setTimeout(async () => {
     try {
       await interaction.guild.members.unban(user.id);
@@ -398,17 +370,14 @@ async function handleBanCommand(interaction) {
   const reason = interaction.options.getString('razón') || 'Sin razón especificada';
   const member = await interaction.guild.members.fetch(user.id);
 
-  // Verifica que no se intente banear a un administrador
   if (member.permissions.has(PermissionFlagsBits.Administrator)) {
     return await interaction.reply('No puedes banear a un usuario con permisos de administrador.');
   }
 
-  // Verifica si el bot tiene permisos suficientes
   if (!interaction.member.permissions.has(PermissionFlagsBits.BanMembers)) {
     return await interaction.reply('No tengo permisos suficientes como para banear a ese usuario.');
   }
 
-  // Banea al usuario
   await interaction.guild.members.ban(user, { reason });
 
   const embed = new EmbedBuilder()
@@ -428,18 +397,15 @@ async function handleUnbanCommand(interaction) {
   const banList = await interaction.guild.bans.fetch();
   const userId = interaction.options.getString('usuario_id');
 
-  // Verifica si el usuario está en la lista de baneados
   const userToUnban = banList.get(userId);
   if (!userToUnban) {
     return await interaction.reply('No se encontró un usuario baneado con ese ID.');
   }
 
-  // Verifica si el bot tiene permisos suficientes
   if (!interaction.member.permissions.has(PermissionFlagsBits.BanMembers)) {
     return await interaction.reply('No tengo permisos suficientes como para desbanear a ese usuario.');
   }
 
-  // Desbanea al usuario
   await interaction.guild.members.unban(userId);
 
   const embed = new EmbedBuilder()
@@ -454,17 +420,14 @@ async function handleUnbanCommand(interaction) {
 async function handleClearCommand(interaction) {
   const amount = interaction.options.getInteger('cantidad');
 
-  // Verifica que el usuario sea administrador
   if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
     return await interaction.reply('No tienes permisos para usar este comando.');
   }
 
-  // Limita la cantidad de mensajes a borrar
   if (amount > 1000) {
     return await interaction.reply('La cantidad de mensajes a borrar debe ser menor o igual a 1000.');
   }
 
-  // Borra los mensajes
   const messages = await interaction.channel.messages.fetch({ limit: amount });
   await interaction.channel.bulkDelete(messages);
 
@@ -474,23 +437,27 @@ async function handleClearCommand(interaction) {
 async function handleSlowmodeCommand(interaction) {
   const timeStr = interaction.options.getString('tiempo');
 
-  // Verifica que el usuario sea administrador
   if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
     return await interaction.reply('No tienes permisos para usar este comando.');
   }
 
-  // Valida el tiempo de slowmode
   const slowmodeDuration = parseTime(timeStr);
   if (!slowmodeDuration) {
     return await interaction.reply('Formato de tiempo inválido. Usa "10s", "1m", "5h", etc.');
   }
 
-  // Establece el slowmode
   await interaction.channel.setRateLimitPerUser(slowmodeDuration / 1000);
 
   await interaction.reply({ content: `Se ha establecido el slowmode a ${timeStr}.`, ephemeral: true }); 
 }
 
-// --- Iniciar sesión ---
+const app = express();
+const PORT = process.env.PORT || 3000;
 
+app.get('/status', (req, res) => {
+res.send('Bot activo');
+});
+app.listen(PORT, () => {
+console.log(Server is running on port ${PORT});
+});
 client.login(process.env.BOT_TOKEN);
