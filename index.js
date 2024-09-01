@@ -458,6 +458,6 @@ app.get('/status', (req, res) => {
 res.send('Bot activo');
 });
 app.listen(PORT, () => {
-console.log(Server is running on port ${PORT});
+console.log(`Server is running on port ${PORT}`);
 });
 client.login(process.env.BOT_TOKEN);
